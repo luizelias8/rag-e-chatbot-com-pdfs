@@ -3,8 +3,7 @@ import streamlit as st
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_groq import ChatGroq
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 
@@ -12,9 +11,9 @@ from PyPDF2 import PdfReader
 load_dotenv()
 
 # Inicializar o modelo de chat
-chat = ChatGroq(
-    api_key=os.getenv('GROQ_API_KEY'), # Chave de API
-    model='llama-3.3-70b-versatile', # Modelo LLM a ser usado
+chat = ChatOpenAI(
+    api_key=os.getenv('OPENAI_API_KEY'), # Chave de API
+    model='gpt-4-1106-preview', # Modelo LLM a ser usado
     temperature=0.2, # Baixa temperatura para respostas mais precisas
     max_tokens=500 # Limite de tokens na resposta
 )
@@ -46,11 +45,7 @@ def obter_base_vetores_dos_pdfs(arquivos):
     pedacos_documento = divisor_texto.split_text(documento)
 
     # Configura o modelo de embeddings para gerar representações vetoriais
-    modelo_embeddings = HuggingFaceEmbeddings(
-        model_name='sentence-transformers/all-MiniLM-L6-v2', # Nome do modelo de embeddings
-        model_kwargs={'device': 'cpu'}, # Define o uso do CPU para processamento
-        encode_kwargs={'normalize_embeddings': False} # Não aplica normalização aos embeddings
-    )
+    modelo_embeddings = OpenAIEmbeddings()
 
     # Cria uma base vetorial persistente usando os textos em pedaços
     base_vetores = FAISS.from_texts(pedacos_documento, modelo_embeddings)
