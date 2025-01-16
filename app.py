@@ -1,6 +1,6 @@
 import os
 import streamlit as st
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
@@ -83,13 +83,25 @@ def main():
     # Inicializa a base de vetores na sessão, se ainda não existir
     if 'base_vetores' not in st.session_state:
         st.session_state.base_vetores = None
+    # Inicializa o estado de desabilitado do prompt se não existir
+    if 'prompt_sistema_desabilitado' not in st.session_state:
+        st.session_state.prompt_sistema_desabilitado = False
 
     # Configura o título e o ícone da página
     st.set_page_config(page_title='Chat com arquivos PDF', page_icon='🤖')
     st.title('Chat com arquivos PDF')
 
-    # Configura a barra lateral para upload de arquivo
+    # Configura a barra lateral para upload de arquivos e criação de persona
     with st.sidebar:
+        # Adicionar um campo para criar um prompt de sistema
+        st.header('🎭 Persona do Chatbot')
+        prompt_sistema = st.text_area(
+            'Defina o comportamento do bot aqui:',
+            placeholder='Ex.: Você é um assistente especializado em análise de dados financeiros.',
+            help='Insira um prompt para personalizar a persona do chatbot.',
+            disabled=st.session_state.prompt_sistema_desabilitado
+        )
+
         # Cabeçalho das configurações
         st.header('📁 Upload de Documentos')
         # Permite envio de arquivos PDF
@@ -105,6 +117,12 @@ def main():
             if st.button('Processar PDFs', use_container_width=True):
                 # Mostra spinner durante processamento
                 with st.spinner('Processando documentos...'):
+                    # Adiciona o prompt do sistema primeiro se existir e não tiver sido adicionado ainda
+                    if prompt_sistema and not any(isinstance(m, SystemMessage) for m in st.session_state.historico_chat):
+                        st.session_state.historico_chat.insert(0, SystemMessage(content=prompt_sistema))
+                        # Desabilita o prompt após processar
+                        st.session_state.prompt_sistema_desabilitado = True
+
                     # Inicializa o histórico de chat com a primeira mensagem do bot
                     st.session_state.historico_chat.append(AIMessage(content='Olá, sou um bot. Como posso ajudar?'))
                     # Processa o PDF e gera a base vetorial
