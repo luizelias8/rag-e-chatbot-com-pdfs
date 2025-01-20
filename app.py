@@ -51,45 +51,21 @@ def obter_base_vetores_dos_pdfs(arquivos):
     base_vetores = FAISS.from_texts(pedacos_documento, modelo_embeddings)
     return base_vetores
 
-def verificar_se_eh_resumo(pergunta):
-    """Verifica se a pergunta é uma solicitação de resumo."""
-    palavras_chave_resumo = ['resumo', 'resuma', 'sintetiza', 'sumarize']
-    return any(palavra in pergunta.lower() for palavra in palavras_chave_resumo)
-
-def obter_documentos_relevantes(base_vetores, pergunta, eh_pedido_resumo=False):
-    """Obtém documentos relevantes da base vetorial, com quantidade adaptativa."""
-    # Se for um pedido de resumo, recupera mais documentos
-    k = 10 if eh_pedido_resumo else 3
-    return base_vetores.similarity_search(pergunta, k=k)
-
-def montar_prompt(fragmentos, pergunta, eh_pedido_resumo=False):
+def montar_prompt(fragmentos, pergunta):
     """Monta manualmente o prompt com os fragmentos e o histórico de conversa."""
 
-    if eh_pedido_resumo:
-        template = """
-        Crie um resumo conciso e bem estruturado usando os trechos do documento fornecidos abaixo.
-        Organize o resumo de forma coerente, conectando as ideias principais encontradas nos diversos trechos.
-        Se perceber que há partes faltando ou desconexas, indique isso no resumo.
+    template = """
+    Use os trechos fornecidos para responder à pergunta do usuário de forma clara e concisa.
+    Se necessário, complemente a resposta utilizando o histórico do chat.
+    Se não souber a resposta com base nos trechos fornecidos e no histórico do chat, diga que não sabe, sem tentar adivinhar ou inventar informações.
+    Se possível, seja direto e objetivo ao responder.
 
-        ### Trechos:
-        {fragmentos}
+    ### Trechos:
+    {fragmentos}
 
-        ### Solicitação:
-        {pergunta}
-        """
-    else:
-        template = """
-        Use os trechos fornecidos para responder à pergunta do usuário de forma clara e concisa.
-        Se necessário, complemente a resposta utilizando o histórico do chat.
-        Se não souber a resposta com base nos trechos fornecidos e no histórico do chat, diga que não sabe, sem tentar adivinhar ou inventar informações.
-        Se possível, seja direto e objetivo ao responder.
-
-        ### Trechos:
-        {fragmentos}
-
-        ### Pergunta:
-        {pergunta}
-        """
+    ### Pergunta:
+    {pergunta}
+    """
 
     # Juntar todos os fragmentos em um único texto
     contexto = '\n'.join([f'{indice}. {fragmento.page_content}\n' for indice, fragmento in enumerate(fragmentos,1)])
@@ -158,21 +134,13 @@ def main():
     if st.session_state.base_vetores is not None:
         # Captura a entrada do usuário no chat
         pergunta = st.chat_input('Digite sua mensagem aqui...')
-
         # Processa a mensagem do usuário e gera resposta
         if pergunta is not None and pergunta != '':
-            # Verifica se é pedido de resumo
-            eh_pedido_resumo = verificar_se_eh_resumo(pergunta)
-
-            # Recuperar documentos relevantes com base na pergunta
-            documentos_relevantes = obter_documentos_relevantes(
-                st.session_state.base_vetores,
-                pergunta,
-                eh_pedido_resumo
-            )
+            # Recuperar documentos relevantes com base na pergunta usando o banco vetorial
+            documentos_relevantes = st.session_state.base_vetores.similarity_search(pergunta, k=3)
 
             # Montar o prompt com os fragmentos
-            prompt = montar_prompt(documentos_relevantes, pergunta, eh_pedido_resumo)
+            prompt = montar_prompt(documentos_relevantes, pergunta)
 
             # Adiciona o prompt com os trechos e a pergunta ao histórico
             st.session_state.historico_chat.append(HumanMessage(content=prompt))
