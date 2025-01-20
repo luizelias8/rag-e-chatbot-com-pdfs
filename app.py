@@ -18,9 +18,8 @@ chat = ChatOpenAI(
     max_tokens=500 # Limite de tokens na resposta
 )
 
-def obter_base_vetores_dos_pdfs(arquivos):
-    """Carrega o conteúdo de múltiplos arquivos PDF, divide o texto em pedaços e cria uma base vetorial."""
-
+def extrair_texto_completo(arquivos):
+    """Extrai o texto completo de todos os PDFs."""
     # Variável para armazenar o texto extraído de todos os PDFs
     documento = ''
 
@@ -32,6 +31,12 @@ def obter_base_vetores_dos_pdfs(arquivos):
         for pagina in leitor_pdf.pages:
             # Adiciona o texto extraído à variável
             documento += pagina.extract_text()
+    return documento
+
+def obter_base_vetores_dos_pdfs(arquivos):
+    """Carrega o conteúdo de múltiplos arquivos PDF, divide o texto em pedaços e cria uma base vetorial."""
+
+    documento = extrair_texto_completo(arquivos)
 
     # Configura o divisor de texto em pedaços
     divisor_texto = CharacterTextSplitter(
@@ -49,9 +54,41 @@ def obter_base_vetores_dos_pdfs(arquivos):
 
     # Cria uma base vetorial persistente usando os textos em pedaços
     base_vetores = FAISS.from_texts(pedacos_documento, modelo_embeddings)
-    return base_vetores
+    return base_vetores, documento
 
-def montar_prompt(fragmentos, pergunta):
+def detectar_pedido_resumo(pergunta):
+    """Detecta se a pergunta do usuário é um pedido de resumo."""
+    palavras_chave_resumo = [
+        'resumo', 'resuma', 'resumir', 'sintetizar', 'síntese',
+        'sumarizar', 'sumário', 'overview', 'principais pontos'
+    ]
+    return any(palavra in pergunta.lower() for palavra in palavras_chave_resumo)
+
+def montar_prompt_resumo(texto_completo, instrucoes_usuario):
+    """Monta o prompt para geração de resumo, incorporando as instruções específicas do usuário."""
+
+    template = """
+    Crie um resumo do documento fornecido seguindo as instruções específicas do usuário.
+
+    ### Instruções do Usuário:
+    {instrucoes}
+
+    ### Diretrizes Gerais (caso não conflitem com as instruções do usuário):
+    1. Manter a sequência lógica do documento original
+    2. Garantir que as informações mais relevantes sejam incluídas
+    3. Manter a clareza e coesão do texto
+
+    ### Documento:
+    {texto}
+
+    Por favor, gere um resumo seguindo as instruções acima.
+    """
+    return template.format(
+        instrucoes=instrucoes_usuario,
+        texto=texto_completo
+    )
+
+def montar_prompt_rag(fragmentos, pergunta):
     """Monta manualmente o prompt com os fragmentos e o histórico de conversa."""
 
     template = """
@@ -83,6 +120,9 @@ def main():
     # Inicializa a base de vetores na sessão, se ainda não existir
     if 'base_vetores' not in st.session_state:
         st.session_state.base_vetores = None
+    # Inicializa o texto completo na sessão, se ainda não existir
+    if 'texto_completo' not in st.session_state:
+        st.session_state.texto_completo = None
     # Inicializa o estado de desabilitado do prompt se não existir
     if 'prompt_sistema_desabilitado' not in st.session_state:
         st.session_state.prompt_sistema_desabilitado = False
@@ -125,8 +165,8 @@ def main():
 
                     # Inicializa o histórico de chat com a primeira mensagem do bot
                     st.session_state.historico_chat.append(AIMessage(content='Olá, sou um bot. Como posso ajudar?'))
-                    # Processa o PDF e gera a base vetorial
-                    st.session_state.base_vetores = obter_base_vetores_dos_pdfs(arquivos_pdfs)
+                    # Processa os PDFs, gera a base vetorial e texto completo dos documentos
+                    st.session_state.base_vetores, st.session_state.texto_completo = obter_base_vetores_dos_pdfs(arquivos_pdfs)
 
                 # Mostra mensagem de sucesso após o processamento
                 st.success('Documentos processados com sucesso!')
@@ -136,11 +176,12 @@ def main():
         pergunta = st.chat_input('Digite sua mensagem aqui...')
         # Processa a mensagem do usuário e gera resposta
         if pergunta is not None and pergunta != '':
-            # Recuperar documentos relevantes com base na pergunta usando o banco vetorial
-            documentos_relevantes = st.session_state.base_vetores.similarity_search(pergunta, k=3)
-
-            # Montar o prompt com os fragmentos
-            prompt = montar_prompt(documentos_relevantes, pergunta)
+            # Verifica se é um pedido de resumo
+            if detectar_pedido_resumo(pergunta):
+                prompt = montar_prompt_resumo(st.session_state.texto_completo, pergunta)
+            else:
+                documentos_relevantes = st.session_state.base_vetores.similarity_search(pergunta, k=3) # Recuperar documentos relevantes com base na pergunta
+                prompt = montar_prompt_rag(documentos_relevantes, pergunta) # Montar o prompt com os fragmentos
 
             # Adiciona o prompt com os trechos e a pergunta ao histórico
             st.session_state.historico_chat.append(HumanMessage(content=prompt))
