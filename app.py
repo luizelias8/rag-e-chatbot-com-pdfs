@@ -124,7 +124,7 @@ def main():
                         st.session_state.prompt_sistema_desabilitado = True
 
                     # Inicializa o histórico de chat com a primeira mensagem do bot
-                    st.session_state.historico_chat.append(AIMessage(content='Olá, sou um bot. Como posso ajudar?'))
+                    st.session_state.historico_chat.append(AIMessage(content='Olá, me faça perguntas a respeito do conteúdo carregado'))
                     # Processa o PDF e gera a base vetorial
                     st.session_state.base_vetores = obter_base_vetores_dos_pdfs(arquivos_pdfs)
 
@@ -132,10 +132,24 @@ def main():
                 st.success('Documentos processados com sucesso!')
 
     if st.session_state.base_vetores is not None:
+        # Exibe o histórico do chat na interface
+        for mensagem in st.session_state.historico_chat:
+            if isinstance(mensagem, AIMessage): # Mensagem do chatbot
+                with st.chat_message('ai'):
+                    st.write(mensagem.content)
+            elif isinstance(mensagem, HumanMessage): # Mensagem do usuário
+                with st.chat_message('human'):
+                    st.write(mensagem.content)
+
         # Captura a entrada do usuário no chat
         pergunta = st.chat_input('Digite sua mensagem aqui...')
+
         # Processa a mensagem do usuário e gera resposta
         if pergunta is not None and pergunta != '':
+            # Exibir a pergunta do usuário no chat
+            with st.chat_message('human'):
+                st.write(pergunta)
+
             # Recuperar documentos relevantes com base na pergunta usando o banco vetorial
             documentos_relevantes = st.session_state.base_vetores.similarity_search(pergunta, k=3)
 
@@ -145,23 +159,25 @@ def main():
             # Adiciona o prompt com os trechos e a pergunta ao histórico
             st.session_state.historico_chat.append(HumanMessage(content=prompt))
 
-            # Exibir um spinner enquanto o modelo gera a resposta
-            with st.spinner('Gerando resposta...'):
-                resposta = chat.invoke(st.session_state.historico_chat) # Obter a resposta do modelo
+            # Cria uma mensagem no chat para o assistente
+            with st.chat_message('ai'):
+                placeholder = st.empty()
+                placeholder.write('Recuperando...')
+
+                # Obtém resposta do modelo considerando o histórico
+                resposta = chat.stream(st.session_state.historico_chat)
+
+                # Inicializa uma string para armazenar a resposta completa
+                resposta_completa = ''
+
+                # Acumula as partes da resposta
+                for parte in placeholder.write_stream(resposta):
+                    resposta_completa += parte # Acumula o texto gerado
 
             # Limpa o histórico antes de adicionar a resposta, removendo o prompt montado
             st.session_state.historico_chat.pop() # Remove a última, que seria o prompt montado
             st.session_state.historico_chat.append(HumanMessage(content=pergunta)) # Adiciona apenas a pergunta ao histórico
-            st.session_state.historico_chat.append(AIMessage(content=resposta.content)) # Adicionar a resposta do modelo ao histórico de mensagens
-
-        # Exibe o histórico do chat na interface
-        for mensagem in st.session_state.historico_chat:
-            if isinstance(mensagem, AIMessage): # Mensagem do chatbot
-                with st.chat_message('ai'):
-                    st.write(mensagem.content)
-            elif isinstance(mensagem, HumanMessage): # Mensagem do usuário
-                with st.chat_message('human'):
-                    st.write(mensagem.content)
+            st.session_state.historico_chat.append(AIMessage(content=resposta_completa)) # Adicionar a resposta do modelo ao histórico de mensagens
 
 # Executa a aplicação se o script for chamado diretamente
 if __name__ == '__main__':
