@@ -1,11 +1,12 @@
 import os
+import tempfile
 import streamlit as st
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from dotenv import load_dotenv
-from PyPDF2 import PdfReader
+from langchain_community.document_loaders import PyPDFLoader
 
 # Carrega as variáveis de ambiente
 load_dotenv()
@@ -19,19 +20,25 @@ chat = ChatOpenAI(
 )
 
 def obter_base_vetores_dos_pdfs(arquivos):
-    """Carrega o conteúdo de múltiplos arquivos PDF, divide o texto em pedaços e cria uma base vetorial."""
+    """Carrega o conteúdo de múltiplos arquivos PDF usando LangChain, divide o texto em pedaços e cria uma base vetorial."""
 
-    # Variável para armazenar o texto extraído de todos os PDFs
-    documento = ''
+    # Lista para armazenar todos os documentos carregados
+    documentos = []
 
-    # Itera sobre cada arquivo enviado
+    # Cria arquivos temporários para cada PDF enviado
     for arquivo in arquivos:
-        # Cria um leitor para o arquivo PDF
-        leitor_pdf = PdfReader(arquivo)
-        # Itera sobre cada página do PDF
-        for pagina in leitor_pdf.pages:
-            # Adiciona o texto extraído à variável
-            documento += pagina.extract_text()
+        # Cria um arquivo temporário para salvar o conteúdo do arquivo enviado
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as arquivo_temporario:
+            arquivo_temporario.write(arquivo.getvalue())
+            caminho_arquivo = arquivo_temporario.name # Obtém o caminho do arquivo temporário
+
+        # Usa o PyPDFLoader do LangChain para carregar o PDF
+        carregador = PyPDFLoader(caminho_arquivo)
+        # Carrega o documento e adiciona à lista de documentos
+        documentos.extend(carregador.load())
+
+        # Remove o arquivo temporário após o carregamento
+        os.unlink(caminho_arquivo)
 
     # Configura o divisor de texto em pedaços
     divisor_texto = CharacterTextSplitter(
@@ -42,13 +49,13 @@ def obter_base_vetores_dos_pdfs(arquivos):
     )
 
     # Divide o texto do documento em pedaços
-    pedacos_documento = divisor_texto.split_text(documento)
+    documentos_divididos = divisor_texto.split_documents(documentos)
 
     # Configura o modelo de embeddings para gerar representações vetoriais
     modelo_embeddings = OpenAIEmbeddings()
 
     # Cria uma base vetorial persistente usando os textos em pedaços
-    base_vetores = FAISS.from_texts(pedacos_documento, modelo_embeddings)
+    base_vetores = FAISS.from_documents(documentos_divididos, modelo_embeddings)
     return base_vetores
 
 def montar_prompt(fragmentos, pergunta):
