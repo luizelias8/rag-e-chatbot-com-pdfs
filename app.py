@@ -14,9 +14,7 @@ load_dotenv()
 # Inicializar o modelo de chat
 chat = ChatOpenAI(
     api_key=os.getenv('OPENAI_API_KEY'), # Chave de API
-    model='gpt-4-1106-preview', # Modelo LLM a ser usado
-    temperature=0.2, # Baixa temperatura para respostas mais precisas
-    max_tokens=500 # Limite de tokens na resposta
+    model='gpt-4-1106-preview' # Modelo LLM a ser usado
 )
 
 def obter_base_vetores_dos_pdfs(arquivos):
