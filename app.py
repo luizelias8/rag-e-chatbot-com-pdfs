@@ -158,7 +158,7 @@ def main():
                 st.write(pergunta)
 
             # Recuperar documentos relevantes com base na pergunta usando o banco vetorial
-            documentos_relevantes = st.session_state.base_vetores.similarity_search(pergunta, k=3)
+            documentos_relevantes = st.session_state.base_vetores.max_marginal_relevance_search(pergunta, k=3, fetch_k=10)
 
             # Montar o prompt com os fragmentos
             prompt = montar_prompt(documentos_relevantes, pergunta)
