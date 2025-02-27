@@ -155,19 +155,24 @@ def main():
             with st.chat_message('human'):
                 st.write(pergunta)
 
-            # Recuperar documentos relevantes com base na pergunta usando o banco vetorial
-            documentos_relevantes = st.session_state.base_vetores.max_marginal_relevance_search(pergunta, k=3, fetch_k=10)
-
-            # Montar o prompt com os fragmentos
-            prompt = montar_prompt(documentos_relevantes, pergunta)
-
-            # Adiciona o prompt com os trechos e a pergunta ao histórico
-            st.session_state.historico_chat.append(HumanMessage(content=prompt))
-
             # Cria uma mensagem no chat para o assistente
             with st.chat_message('ai'):
                 placeholder = st.empty()
+
+                # Exibe uma mensagem temporária no chat enquanto os documentos relevantes são recuperados com base na pergunta do usuário.
                 placeholder.write('Recuperando...')
+
+                # Recuperar documentos relevantes com base na pergunta usando o banco vetorial
+                documentos_relevantes = st.session_state.base_vetores.max_marginal_relevance_search(pergunta, k=3, fetch_k=10)
+
+                # Exibe uma mensagem temporária no chat indicando que o modelo está processando a resposta com base nos fragmentos recuperados.
+                placeholder.write('Gerando resposta...')
+
+                # Montar o prompt com os fragmentos
+                prompt = montar_prompt(documentos_relevantes, pergunta)
+
+                # Adiciona o prompt com os trechos e a pergunta ao histórico
+                st.session_state.historico_chat.append(HumanMessage(content=prompt))
 
                 # Obtém resposta do modelo considerando o histórico
                 resposta = chat.stream(st.session_state.historico_chat)
