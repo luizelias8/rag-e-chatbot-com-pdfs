@@ -160,13 +160,13 @@ def main():
                 placeholder = st.empty()
 
                 # Exibe uma mensagem temporária no chat enquanto os documentos relevantes são recuperados com base na pergunta do usuário.
-                placeholder.write('Buscando documentos relevantes...')
+                placeholder.write('Recuperando...')
 
                 # Recuperar documentos relevantes com base na pergunta usando o banco vetorial
                 documentos_relevantes = st.session_state.base_vetores.max_marginal_relevance_search(pergunta, k=3, fetch_k=10)
 
                 # Exibe uma mensagem temporária no chat indicando que o modelo está processando a resposta com base nos fragmentos recuperados.
-                placeholder.write('Gerando resposta com base nos documentos encontrados...')
+                placeholder.write('Gerando resposta...')
 
                 # Montar o prompt com os fragmentos
                 prompt = montar_prompt(documentos_relevantes, pergunta)
