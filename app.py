@@ -3,6 +3,7 @@ import tempfile
 import streamlit as st
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain.text_splitter import CharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from dotenv import load_dotenv
@@ -39,11 +40,10 @@ def obter_base_vetores_dos_pdfs(arquivos):
         os.unlink(caminho_arquivo)
 
     # Configura o divisor de texto em pedaços
-    divisor_texto = CharacterTextSplitter(
-        separator='\n', # Define o separador como uma quebra de linha
+    divisor_texto = RecursiveCharacterTextSplitter(
+        separators=['\n\n', '\n', '.', ' ', ''], # Define o separador como uma quebra de linha
         chunk_size=500, # Define o tamanho de cada pedaço de texto
         chunk_overlap=200, # Define a sobreposição entre os pedaços
-        length_function=len # Usa o comprimento do texto para controle de tamanho
     )
 
     # Divide o texto do documento em pedaços
