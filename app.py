@@ -8,6 +8,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
+from langchain.prompts import PromptTemplate
 
 # Carrega as variáveis de ambiente
 load_dotenv()
@@ -59,7 +60,7 @@ def obter_base_vetores_dos_pdfs(arquivos):
 def montar_prompt(fragmentos, pergunta):
     """Monta manualmente o prompt com os fragmentos e o histórico de conversa."""
 
-    template = """
+    template = PromptTemplate.from_template("""
     Use os trechos fornecidos para responder à pergunta do usuário de forma clara e concisa.
     Se necessário, complemente a resposta utilizando o histórico do chat.
     Se não souber a resposta com base nos trechos fornecidos e no histórico do chat, diga que não sabe, sem tentar adivinhar ou inventar informações.
@@ -70,7 +71,7 @@ def montar_prompt(fragmentos, pergunta):
 
     ### Pergunta:
     {pergunta}
-    """
+    """)
 
     # Juntar todos os fragmentos em um único texto
     contexto = '\n'.join([f'{indice}. {fragmento.page_content}\n' for indice, fragmento in enumerate(fragmentos,1)])
